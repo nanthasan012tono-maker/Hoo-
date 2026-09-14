@@ -1,0 +1,477 @@
+--// GOJO MENU - Roblox Studio
+--// พื้นหลังรูปภาพ + วิ่งเร็ว + กระโดดสูง + มุดดิน + ปิดเมนูได้
+--// ธีม: Free Fire Sakura Mods
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+--==================================================
+-- ⚙️ ตั้งค่า ID รูปภาพ
+--==================================================
+local IMAGE_ID = "rbxassetid://ใส่_ID_รูป_ตรงนี้" -- 👈 เปลี่ยนตรงนี้!
+
+--==================================================
+-- SETTINGS
+--==================================================
+local Settings = {
+    TargetEnabled = false,
+    ShowLine = true,
+    Range = 200,
+    Speed = 16,
+    JumpPower = 50,
+    DigEnabled = false,
+    DigDepth = 3,
+    OriginalSpeed = 16,
+    OriginalJumpPower = 50,
+}
+
+local character, humanoidRootPart, humanoid
+
+local function setupCharacter()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+    Settings.Speed = Settings.OriginalSpeed
+    Settings.JumpPower = Settings.OriginalJumpPower
+    humanoid.WalkSpeed = Settings.Speed
+    humanoid.JumpPower = Settings.JumpPower
+end
+setupCharacter()
+player.CharacterAdded:Connect(setupCharacter)
+
+--==================================================
+-- SCREEN GUI
+--==================================================
+if playerGui:FindFirstChild("GojoMenu") then
+    playerGui.GojoMenu:Destroy()
+end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "GojoMenu"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = playerGui
+
+--==================================================
+-- MAIN FRAME + พื้นหลังรูปภาพ
+--==================================================
+local main = Instance.new("Frame")
+main.Size = UDim2.fromOffset(370, 580)
+main.Position = UDim2.new(0.5, -185, 0.5, -290)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 35)
+main.BorderSizePixel = 0
+main.Active = true
+main.ClipsDescendants = true
+main.Parent = gui
+
+-- 🖼️ พื้นหลังรูปภาพ
+local bgImage = Instance.new("ImageLabel")
+bgImage.Name = "Background"
+bgImage.Size = UDim2.fromScale(1, 1)
+bgImage.Position = UDim2.fromOffset(0, 0)
+bgImage.BackgroundTransparency = 0.3 -- ความเข้ม-จางของรูป 0=ทึบ 1=โปร่ง
+bgImage.Image = IMAGE_ID
+bgImage.ScaleType = Enum.ScaleType.Crop
+bgImage.Parent = main
+
+-- มุมโค้ง
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = main
+
+-- มาสก์รูปให้โค้งตามเฟรม
+local mask = Instance.new("UICorner")
+mask.CornerRadius = UDim.new(0, 12)
+mask.Parent = bgImage
+
+--==================================================
+-- TITLE BAR + ปุ่มปิด
+--==================================================
+local title = Instance.new("TextLabel")
+title.Name = "TitleBar"
+title.Size = UDim2.new(1, 0, 0, 45)
+title.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+title.BackgroundTransparency = 0.2 -- ให้รูปพื้นหลังซ่อนอยู่นิดหน่อย
+title.Text = "⚡ GOJO MENU ⚡"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Active = true
+title.TextXAlignment = Enum.TextXAlignment.Center
+title.Parent = main
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = title
+
+-- ปุ่มปิดเมนู
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.fromOffset(40, 35)
+closeBtn.Position = UDim2.new(1, -45, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.TextScaled = true
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.ZIndex = 10
+closeBtn.Parent = title
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeBtn
+
+closeBtn.MouseButton1Click:Connect(function()
+    main.Visible = not main.Visible
+    closeBtn.Text = main.Visible and "✕" or "◻"
+end)
+
+--==================================================
+-- TAB BAR
+--==================================================
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, -20, 0, 45)
+tabBar.Position = UDim2.fromOffset(10, 55)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = main
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+tabLayout.Padding = UDim.new(0, 5)
+tabLayout.Parent = tabBar
+
+--==================================================
+-- CONTENT HOLDER
+--==================================================
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -20, 1, -115)
+content.Position = UDim2.fromOffset(10, 105)
+content.BackgroundTransparency = 1
+content.ClipsDescendants = true
+content.Parent = main
+
+--==================================================
+-- CREATE SCROLLING TAB
+--==================================================
+local tabs = {}
+local tabButtons = {}
+local activeTabColor = Color3.fromRGB(0, 120, 255)
+local defaultTabColor = Color3.fromRGB(35, 35, 70)
+
+local function createTab(name)
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Name = name
+    scroll.Size = UDim2.fromScale(1, 1)
+    scroll.BackgroundColor3 = Color3.fromRGB(20, 20, 45)
+    scroll.BackgroundTransparency = 0.4 -- ให้รูปพื้นหลังโชว์ผ่านได้
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 8
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 120, 255)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.Visible = false
+    scroll.Parent = content
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, 12)
+    padding.PaddingBottom = UDim.new(0, 20)
+    padding.PaddingLeft = UDim.new(0, 12)
+    padding.PaddingRight = UDim.new(0, 12)
+    padding.Parent = scroll
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 12)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+    end)
+
+    tabs[name] = scroll
+    return scroll
+end
+
+--==================================================
+-- CREATE TABS
+--==================================================
+local targetTab = createTab("Target")
+local moveTab = createTab("Movement")
+local espTab = createTab("ESP")
+local rangeTab = createTab("Range")
+local settingsTab = createTab("Settings")
+
+--==================================================
+-- TAB BUTTON
+--==================================================
+local function createTabButton(text, tab)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.fromOffset(60, 40)
+    button.BackgroundColor3 = defaultTabColor
+    button.BackgroundTransparency = 0.3
+    button.Text = text
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextScaled = true
+    button.Font = Enum.Font.GothamBold
+    button.AutoLocalize = false
+    button.Parent = tabBar
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = button
+
+    button.MouseButton1Click:Connect(function()
+        for _, frame in pairs(tabs) do frame.Visible = false end
+        for _, btn in pairs(tabButtons) do
+            btn.BackgroundColor3 = defaultTabColor
+            btn.BackgroundTransparency = 0.3
+        end
+        tab.Visible = true
+        button.BackgroundColor3 = activeTabColor
+        button.BackgroundTransparency = 0
+    end)
+
+    table.insert(tabButtons, button)
+    return button
+end
+
+createTabButton("🎯", targetTab)
+createTabButton("🏃", moveTab)
+createTabButton("👁️", espTab)
+createTabButton("📏", rangeTab)
+createTabButton("⚙️", settingsTab)
+
+--==================================================
+-- UI HELPERS
+--==================================================
+local function createLabel(parent, text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 45)
+    label.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
+    label.BackgroundTransparency = 0.3
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.AutoLocalize = false
+    label.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = label
+    return label
+end
+
+local function createButton(parent, text, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 50)
+    button.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+    button.Text = text
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextScaled = true
+    button.Font = Enum.Font.GothamBold
+    button.AutoLocalize = false
+    button.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = button
+
+    button.MouseButton1Click:Connect(callback)
+    return button
+end
+
+--==================================================
+-- 🎯 TARGET TAB
+--==================================================
+createLabel(targetTab, "🎯 TARGET / NPC")
+
+local targetButton = createButton(targetTab, "ล็อกเป้าหมาย NPC : OFF ❌", function()
+    Settings.TargetEnabled = not Settings.TargetEnabled
+    targetButton.Text = Settings.TargetEnabled and "ล็อกเป้าหมาย NPC : ON ✅" or "ล็อกเป้าหมาย NPC : OFF ❌"
+    targetButton.BackgroundColor3 = Settings.TargetEnabled and Color3.fromRGB(0, 180, 80) or Color3.fromRGB(0, 100, 255)
+end)
+
+createLabel(targetTab, "📌 ระบบนี้สำหรับทดสอบ NPC ในเกมของตัวเองเท่านั้น")
+
+createButton(targetTab, "🔄 รีเซ็ตเป้าหมาย", function()
+    Settings.TargetEnabled = false
+    targetButton.Text = "ล็อกเป้าหมาย NPC : OFF ❌"
+    targetButton.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+end)
+
+--==================================================
+-- 🏃 MOVEMENT TAB
+--==================================================
+createLabel(moveTab, "🏃 การเคลื่อนไหว")
+
+-- วิ่งเร็ว
+local speedLabel = createLabel(moveTab, "🏃 ความเร็ววิ่ง: " .. Settings.Speed .. " km/h")
+
+createButton(moveTab, "➕ เพิ่มความเร็ว +5", function()
+    if not humanoid then return end
+    Settings.Speed = math.min(Settings.Speed + 5, 200)
+    humanoid.WalkSpeed = Settings.Speed
+    speedLabel.Text = "🏃 ความเร็ววิ่ง: " .. Settings.Speed .. " km/h"
+end)
+
+createButton(moveTab, "➖ ลดความเร็ว -5", function()
+    if not humanoid then return end
+    Settings.Speed = math.max(Settings.Speed - 5, 16)
+    humanoid.WalkSpeed = Settings.Speed
+    speedLabel.Text = "🏃 ความเร็ววิ่ง: " .. Settings.Speed .. " km/h"
+end)
+
+createButton(moveTab, "🔄 ความเร็วปกติ", function()
+    if not humanoid then return end
+    Settings.Speed = Settings.OriginalSpeed
+    humanoid.WalkSpeed = Settings.Speed
+    speedLabel.Text = "🏃 ความเร็ววิ่ง: " .. Settings.Speed .. " km/h"
+end)
+
+-- กระโดดสูง
+local jumpLabel = createLabel(moveTab, "⬆️ กระโดดสูง: " .. Settings.JumpPower .. " หน่วย")
+
+createButton(moveTab, "⬆️ เพิ่มกระโดด +10", function()
+    if not humanoid then return end
+    Settings.JumpPower = math.min(Settings.JumpPower + 10, 200)
+    humanoid.JumpPower = Settings.JumpPower
+    jumpLabel.Text = "⬆️ กระโดดสูง: " .. Settings.JumpPower .. " หน่วย"
+end)
+
+createButton(moveTab, "⬇️ ลดกระโดด -10", function()
+    if not humanoid then return end
+    Settings.JumpPower = math.max(Settings.JumpPower - 10, 50)
+    humanoid.JumpPower = Settings.JumpPower
+    jumpLabel.Text = "⬆️ กระโดดสูง: " .. Settings.JumpPower .. " หน่วย"
+end)
+
+createButton(moveTab, "🔄 กระโดดปกติ", function()
+    if not humanoid then return end
+    Settings.JumpPower = Settings.OriginalJumpPower
+    humanoid.JumpPower = Settings.JumpPower
+    jumpLabel.Text = "⬆️ กระโดดสูง: " .. Settings.JumpPower .. " หน่วย"
+end)
+
+-- มุดดิน
+local digLabel = createLabel(moveTab, "🕳️ มุดลึก: " .. Settings.DigDepth .. " เมตร")
+local digButton
+
+digButton = createButton(moveTab, "🕳️ มุดดิน: OFF ❌", function()
+    Settings.DigEnabled = not Settings.DigEnabled
+    digButton.Text = Settings.DigEnabled and "🕳️ มุดดิน: ON ✅" or "🕳️ มุดดิน: OFF ❌"
+    digButton.BackgroundColor3 = Settings.DigEnabled and Color3.fromRGB(0, 180, 80) or Color3.fromRGB(0, 100, 255)
+    if not Settings.DigEnabled and humanoidRootPart then
+        humanoidRootPart.Position = humanoidRootPart.Position + Vector3.new(0, Settings.DigDepth, 0)
+    end
+end)
+
+createButton(moveTab, "⬇️ มุดลึก +1 เมตร", function()
+    Settings.DigDepth = math.min(Settings.DigDepth + 1, 10)
+    digLabel.Text = "🕳️ มุดลึก: " .. Settings.DigDepth .. " เมตร"
+end)
+
+createButton(moveTab, "⬆️ มุดตื้น -1 เมตร", function()
+    Settings.DigDepth = math.max(Settings.DigDepth - 1, 1)
+    digLabel.Text = "🕳️ มุดลึก: " .. Settings.DigDepth .. " เมตร"
+end)
+
+-- อัปเดตมุดดินตลอดเวลา
+RunService.Heartbeat:Connect(function()
+    if Settings.DigEnabled and humanoidRootPart then
+        local pos = humanoidRootPart.Position
+        humanoidRootPart.Position = Vector3.new(pos.X, pos.Y - Settings.DigDepth, pos.Z)
+    end
+end)
+
+--==================================================
+-- 👁️ ESP TAB
+--==================================================
+createLabel(espTab, "👁️ NPC DISPLAY")
+
+local lineButton = createButton(espTab, "แสดงเส้น : ON ✅", function()
+    Settings.ShowLine = not Settings.ShowLine
+    lineButton.Text = Settings.ShowLine and "แสดงเส้น : ON ✅" or "แสดงเส้น : OFF ❌"
+    lineButton.BackgroundColor3 = Settings.ShowLine and Color3.fromRGB(0, 180, 80) or Color3.fromRGB(200, 60, 60)
+end)
+
+for i = 1, 12 do
+    createLabel(espTab, "NPC Display Option #" .. i)
+end
+
+--==================================================
+-- 📏 RANGE TAB
+--==================================================
+createLabel(rangeTab, "📏 TARGET RANGE")
+
+local rangeLabel = createLabel(rangeTab, "ระยะปัจจุบัน : " .. Settings.Range .. " เมตร")
+
+createButton(rangeTab, "➕ เพิ่ม 50", function()
+    Settings.Range = math.min(Settings.Range + 50, 500)
+    rangeLabel.Text = "ระยะปัจจุบัน : " .. Settings.Range .. " เมตร"
+end)
+
+createButton(rangeTab, "➖ ลด 50", function()
+    Settings.Range = math.max(Settings.Range - 50, 50)
+    rangeLabel.Text = "ระยะปัจจุบัน : " .. Settings.Range .. " เมตร"
+end)
+
+for i = 1, 10 do
+    createLabel(rangeTab, "Range Preset " .. i)
+end
+
+--==================================================
+-- ⚙️ SETTINGS TAB
+--==================================================
+createLabel(settingsTab, "⚙️ SETTINGS")
+
+for i = 1, 15 do
+    createButton(settingsTab, "Setting Option " .. i, function()
+        print("เลือก Setting Option", i)
+    end)
+end
+
+--==================================================
+-- เปิดแท็บแรก + ลากเมนูได้
+--==================================================
+targetTab.Visible = true
+if #tabButtons > 0 then
+    tabButtons[1].BackgroundColor3 = activeTabColor
+    tabButtons[1].BackgroundTransparency = 0
+end
+
+-- ลากเมนูได้ (PC + มือถือ)
+local dragging = false
+local dragStart, startPos
+
+local function startDrag(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+    end
+end
+
+local function updateDrag(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end
+
+local function endDrag(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end
+
+title.InputBegan:Connect(startDrag)
+UserInputService.InputChanged:Connect(updateDrag)
+UserInputService.InputEnded:Connect(endDrag)
